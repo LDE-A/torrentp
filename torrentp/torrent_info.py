@@ -15,12 +15,12 @@ class TorrentInfo:
         """わたくしがトレントファイルの情報を取得させていただきますわ"""
         files = []
         if self._info.num_files() > 0:
+            file_storage = self._info.files()
             for i in range(self._info.num_files()):
-                file_entry = self._info.files().file_entry(i)
                 files.append({
                     'index': i,
-                    'path': file_entry.path,
-                    'size': file_entry.size
+                    'path': file_storage.file_path(i),
+                    'size': file_storage.file_size(i)
                 })
         return files
 

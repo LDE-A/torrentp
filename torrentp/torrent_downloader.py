@@ -31,19 +31,18 @@ class TorrentDownloader:
                     session = self._session()
                     self._file = session.add_torrent(self._add_torrent_params)
 
-                # メタデータの取得を待機いたしますわ
                 print("あら、メタデータを取得中ですわ。しばらくお待ちくださいまし...")
                 while not self._file.has_metadata():
                     time.sleep(1)
 
                 info = self._file.get_torrent_info()
                 files = []
+                file_storage = info.files()
                 for i in range(info.num_files()):
-                    file_entry = info.files().file_entry(i)
                     files.append({
                         'index': i,
-                        'path': file_entry.path,
-                        'size': file_entry.size
+                        'path': file_storage.file_path(i),
+                        'size': file_storage.file_size(i)
                     })
                 return files
             else:
