@@ -2,6 +2,7 @@ from .session import Session
 from .torrent_info import TorrentInfo
 from .downloader import Downloader
 import libtorrent as lt
+import time
 
 
 class TorrentDownloader:
@@ -21,11 +22,37 @@ class TorrentDownloader:
 
     def get_files_info(self):
         """わたくしがトレントファイルの内容を表示させていただきますわ"""
-        if not self._file_path.startswith('magnet:'):
-            if not self._torrent_info:
-                self._torrent_info = TorrentInfo(self._file_path, self._lt)
-            return self._torrent_info.get_files_info()
-        return None
+        try:
+            if self._file_path.startswith('magnet:'):
+                if not self._add_torrent_params:
+                    self._add_torrent_params = self._lt.parse_magnet_uri(self._file_path)
+                    self._add_torrent_params.save_path = self._save_path
+                if not self._file:
+                    session = self._session()
+                    self._file = session.add_torrent(self._add_torrent_params)
+
+                # メタデータの取得を待機いたしますわ
+                print("あら、メタデータを取得中ですわ。しばらくお待ちくださいまし...")
+                while not self._file.has_metadata():
+                    time.sleep(1)
+
+                info = self._file.get_torrent_info()
+                files = []
+                for i in range(info.num_files()):
+                    file_entry = info.files().file_entry(i)
+                    files.append({
+                        'index': i,
+                        'path': file_entry.path,
+                        'size': file_entry.size
+                    })
+                return files
+            else:
+                if not self._torrent_info:
+                    self._torrent_info = TorrentInfo(self._file_path, self._lt)
+                return self._torrent_info.get_files_info()
+        except Exception as e:
+            print(f"\n申し訳ございませんが、ファイル情報の取得に失敗いたしましたわ: {e}")
+            return []
 
     async def start_download(self, download_speed=0, upload_speed=0):
         if self._file_path.startswith('magnet:'):

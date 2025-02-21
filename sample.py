@@ -8,6 +8,7 @@ import sys
 sys.path.append('/content')
 
 # これで以下のようにインポートが可能になりますわ
+from torrentp.downloader import DownloadTimeoutError
 from torrentp.torrentp.torrent_downloader import TorrentDownloader
 
 # 使用例
@@ -25,5 +26,8 @@ for file in files:
 selected_indices = [0, 2]  # 例：0番目と2番目のファイルのみをダウンロード
 
 # 選択したファイルのみをダウンロード
-torrent = TorrentDownloader("example.torrent", ".", selected_files=selected_indices)
-await torrent.start_download()
+torrent = TorrentDownloader("example.torrent", ".", selected_files=selected_indices,timeout=60)
+try:
+    await torrent.start_download()
+except DownloadTimeoutError:
+    print("ダウンロードがタイムアウトしましたわ。")
