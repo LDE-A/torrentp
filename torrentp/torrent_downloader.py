@@ -5,7 +5,7 @@ import libtorrent as lt
 
 
 class TorrentDownloader:
-    def __init__(self, file_path, save_path, port=6881, stop_after_download=False, selected_files=None):
+    def __init__(self, file_path, save_path, port=6881, stop_after_download=False, selected_files=None, timeout=300):
         self._file_path = file_path
         self._save_path = save_path
         self._port = port  # Default port is 6881
@@ -17,6 +17,7 @@ class TorrentDownloader:
         self._session = Session(self._lt, port=self._port)  # Pass port to Session
         self._stop_after_download = stop_after_download
         self._selected_files = selected_files
+        self._timeout = timeout
 
     def get_files_info(self):
         """わたくしがトレントファイルの内容を表示させていただきますわ"""
@@ -32,7 +33,8 @@ class TorrentDownloader:
             self._add_torrent_params.save_path = self._save_path
             self._downloader = Downloader(
                 session=self._session(), torrent_info=self._add_torrent_params,
-                save_path=self._save_path, libtorrent=lt, is_magnet=True, stop_after_download=self._stop_after_download
+                save_path=self._save_path, libtorrent=lt, is_magnet=True,
+                stop_after_download=self._stop_after_download, timeout=self._timeout
             )
 
         else:
@@ -41,7 +43,7 @@ class TorrentDownloader:
                 session=self._session(), torrent_info=self._torrent_info(),
                 save_path=self._save_path, libtorrent=None, is_magnet=False,
                 stop_after_download=self._stop_after_download,
-                selected_files=self._selected_files
+                selected_files=self._selected_files, timeout=self._timeout
             )
 
         self._session.set_download_limit(download_speed)

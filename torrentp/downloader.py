@@ -2,9 +2,14 @@ import sys
 import asyncio
 import math
 import time
+import os
+
+class DownloadTimeoutError(Exception):
+    """まぁ、時間切れというわけですわ"""
+    pass
 
 class Downloader:
-    def __init__(self, session, torrent_info, save_path, libtorrent, is_magnet, stop_after_download=False, selected_files=None):
+    def __init__(self, session, torrent_info, save_path, libtorrent, is_magnet, stop_after_download=False, selected_files=None, timeout=300):
         self._session = session
         self._torrent_info = torrent_info
         self._save_path = save_path
@@ -18,6 +23,9 @@ class Downloader:
         self._paused = False
         self._stop_after_download = stop_after_download
         self._selected_files = selected_files
+        self._timeout = timeout  # デフォルトで5分のタイムアウトを設定いたしますわ
+        self._last_progress = 0
+        self._last_progress_time = time.time()
 
     def status(self):
         if not self._is_magnet:
@@ -47,20 +55,53 @@ class Downloader:
         self._name = self.status().name
         return self._name
 
+    def _cleanup_files(self):
+        """わたくしが失敗したダウンロードの痕跡を消し去りますわ"""
+        if self._file and not self._is_magnet:
+            try:
+                info = self._file.get_torrent_info()
+                for i in range(info.num_files()):
+                    file_path = os.path.join(self._save_path, info.files().file_path(i))
+                    if os.path.exists(file_path):
+                        os.remove(file_path)
+            except Exception as e:
+                print(f"\nファイルの削除に失敗いたしましたわ: {e}")
+
+    def _check_timeout(self, current_progress):
+        """進捗が停滞していないか確認させていただきますわ"""
+        current_time = time.time()
+        if current_progress > self._last_progress:
+            self._last_progress = current_progress
+            self._last_progress_time = current_time
+        elif current_time - self._last_progress_time > self._timeout:
+            self._cleanup_files()
+            raise DownloadTimeoutError(f"\nあら、{self._timeout}秒以上進捗がございませんわ。タイムアウトですわ。")
+
     async def download(self):
-        self.get_size_info(self.status().total_wanted)
+        try:
+            self.get_size_info(self.status().total_wanted)
 
-        while not self._status.is_seeding:
-            if not self._paused:
-                self._get_status_progress(self.status())
-                sys.stdout.flush()
+            while not self._status.is_seeding:
+                if not self._paused:
+                    status = self.status()
+                    self._get_status_progress(status)
+                    self._check_timeout(status.progress)
+                    sys.stdout.flush()
 
-            await asyncio.sleep(1)
+                await asyncio.sleep(1)
 
-        if self._stop_after_download:
+            if self._stop_after_download:
+                self.stop()
+            else:
+                print('\033[92m' + "\nDownloaded successfully." + '\033[0m')
+
+        except DownloadTimeoutError as e:
             self.stop()
-        else:
-            print('\033[92m' +  "\nDownloaded successfully." + '\033[0m')
+            raise e
+        except Exception as e:
+            self._cleanup_files()
+            self.stop()
+            raise Exception(f"\nダウンロード中に予期せぬ問題が発生いたしましたわ: {e}")
 
     def _get_status_progress(self, s):
         _percentage = s.progress * 100
