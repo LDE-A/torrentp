@@ -37,12 +37,12 @@ class TorrentDownloader:
 
                 info = self._file.get_torrent_info()
                 files = []
-                file_storage = info.files()
-                for i in range(info.num_files()):
+                total_files = info.num_files()
+                for i in range(total_files):
                     files.append({
                         'index': i,
-                        'path': file_storage.file_path(i),
-                        'size': file_storage.file_size(i)
+                        'path': str(info.files().at(i).path),
+                        'size': info.files().at(i).size
                     })
                 return files
             else:

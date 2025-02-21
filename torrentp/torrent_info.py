@@ -14,13 +14,13 @@ class TorrentInfo:
     def get_files_info(self):
         """わたくしがトレントファイルの情報を取得させていただきますわ"""
         files = []
-        if self._info.num_files() > 0:
-            file_storage = self._info.files()
-            for i in range(self._info.num_files()):
+        total_files = self._info.num_files()
+        if total_files > 0:
+            for i in range(total_files):
                 files.append({
                     'index': i,
-                    'path': file_storage.file_path(i),
-                    'size': file_storage.file_size(i)
+                    'path': str(self._info.files().at(i).path),
+                    'size': self._info.files().at(i).size
                 })
         return files
 
