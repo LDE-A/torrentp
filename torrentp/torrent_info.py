@@ -11,6 +11,19 @@ class TorrentInfo:
         self._info = self._lt.torrent_info(self._path)
         return self._info
 
+    def get_files_info(self):
+        """わたくしがトレントファイルの情報を取得させていただきますわ"""
+        files = []
+        if self._info.num_files() > 0:
+            for i in range(self._info.num_files()):
+                file_entry = self._info.files().file_entry(i)
+                files.append({
+                    'index': i,
+                    'path': file_entry.path,
+                    'size': file_entry.size
+                })
+        return files
+
     def __str__(self):
         pass
 

@@ -4,7 +4,7 @@ import math
 import time
 
 class Downloader:
-    def __init__(self, session, torrent_info, save_path, libtorrent, is_magnet, stop_after_download=False):
+    def __init__(self, session, torrent_info, save_path, libtorrent, is_magnet, stop_after_download=False, selected_files=None):
         self._session = session
         self._torrent_info = torrent_info
         self._save_path = save_path
@@ -17,10 +17,21 @@ class Downloader:
         self._is_magnet = is_magnet
         self._paused = False
         self._stop_after_download = stop_after_download
+        self._selected_files = selected_files
 
     def status(self):
         if not self._is_magnet:
             self._file = self._session.add_torrent({'ti': self._torrent_info, 'save_path': f'{self._save_path}'})
+            if self._selected_files is not None:
+                # 特定のファイルのみ選択する場合の処理ですわ
+                file_priorities = [0] * self._file.get_torrent_info().num_files()
+                for file_index in self._selected_files:
+                    file_priorities[file_index] = 1
+                self._file.prioritize_files(file_priorities)
+            else:
+                # すべてのファイルをダウンロードする場合の処理ですわ
+                file_priorities = [1] * self._file.get_torrent_info().num_files()
+                self._file.prioritize_files(file_priorities)
             self._status = self._file.status()
         else:
             self._add_torrent_params = self._torrent_info
@@ -45,7 +56,7 @@ class Downloader:
                 sys.stdout.flush()
 
             await asyncio.sleep(1)
-        
+
         if self._stop_after_download:
             self.stop()
         else:
@@ -53,12 +64,12 @@ class Downloader:
 
     def _get_status_progress(self, s):
         _percentage = s.progress * 100
-        _download_speed = s.download_rate / 1000
+        _download_speed = s.download_rate / 1000 / 1000
         _upload_speed = s.upload_rate / 1000
 
         counting = math.ceil(_percentage / 5)
         visual_loading = '#' * counting + ' ' * (20 - counting)
-        _message = "\r\033[42m %.1f Kb/s \033[0m|\033[46m up: %.1f Kb/s \033[0m| status: %s | peers: %d  \033[96m|%s|\033[0m %d%%" % (_download_speed, _upload_speed, s.state, s.num_peers, visual_loading, _percentage)
+        _message = "\r\033[42m %.2f mb/s \033[0m|\033[46m up: %.1f Kb/s \033[0m| status: %s | peers: %d  \033[96m|%s|\033[0m %d%%" % (_download_speed, _upload_speed, s.state, s.num_peers, visual_loading, _percentage)
         print(_message, end='')
 
     def get_size_info(self, byte_length):
