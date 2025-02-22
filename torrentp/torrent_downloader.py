@@ -6,7 +6,9 @@ import time
 
 
 class TorrentDownloader:
-    def __init__(self, file_path, save_path, port=6881, stop_after_download=False, selected_files=None, timeout=300):
+    def __init__(self, file_path: str, save_path: str, port: int = 6881,
+                 stop_after_download: bool = False, selected_files: list = None,
+                 timeout: int = 300):
         self._file_path = file_path
         self._save_path = save_path
         self._port = port  # Default port is 6881
@@ -53,14 +55,18 @@ class TorrentDownloader:
             print(f"\n申し訳ございませんが、ファイル情報の取得に失敗いたしましたわ: {e}")
             return []
 
-    async def start_download(self, download_speed=0, upload_speed=0):
+    async def start_download(self, download_speed: int = 0, upload_speed: int = 0):
         if self._file_path.startswith('magnet:'):
             self._add_torrent_params = self._lt.parse_magnet_uri(self._file_path)
             self._add_torrent_params.save_path = self._save_path
             self._downloader = Downloader(
-                session=self._session(), torrent_info=self._add_torrent_params,
-                save_path=self._save_path, libtorrent=lt, is_magnet=True,
-                stop_after_download=self._stop_after_download, timeout=self._timeout
+                session=self._session(),
+                torrent_info=self._add_torrent_params,
+                save_path=self._save_path,
+                libtorrent=lt,
+                is_magnet=True,
+                stop_after_download=self._stop_after_download,
+                timeout=self._timeout  # ここでtimeoutを確実に渡しますわ
             )
 
         else:

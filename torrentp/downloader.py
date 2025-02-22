@@ -9,7 +9,7 @@ class DownloadTimeoutError(Exception):
     pass
 
 class Downloader:
-    def __init__(self, session, torrent_info, save_path, libtorrent, is_magnet, stop_after_download=False, selected_files=None, timeout=300):
+    def __init__(self, session, torrent_info, save_path, libtorrent, is_magnet, stop_after_download=False, selected_files=None, timeout: int = 300):
         self._session = session
         self._torrent_info = torrent_info
         self._save_path = save_path
@@ -26,6 +26,7 @@ class Downloader:
         self._timeout = timeout  # デフォルトで5分のタイムアウトを設定いたしますわ
         self._last_progress = 0
         self._last_progress_time = time.time()
+        self._download_started = False  # ダウンロードが開始されたかどうかを追跡いたしますわ
 
     def status(self):
         if not self._is_magnet:
@@ -67,19 +68,28 @@ class Downloader:
             except Exception as e:
                 print(f"\nファイルの削除に失敗いたしましたわ: {e}")
 
-    def _check_timeout(self, current_progress):
+    def _check_timeout(self, current_progress: float) -> None:
         """進捗が停滞していないか確認させていただきますわ"""
         current_time = time.time()
-        if current_progress > self._last_progress:
-            self._last_progress = current_progress
-            self._last_progress_time = current_time
-        elif current_time - self._last_progress_time > self._timeout:
-            self._cleanup_files()
-            raise DownloadTimeoutError(f"\nあら、{self._timeout}秒以上進捗がございませんわ。タイムアウトですわ。")
+
+        # 進捗が0より大きい場合は、ダウンロードが開始されているとみなしますわ
+        if current_progress > 0:
+            self._download_started = True
+            return  # ダウンロードが開始されている場合はタイムアウトチェックを行いませんわ
+
+        # ダウンロードがまだ始まっていない場合のみタイムアウトをチェックいたしますわ
+        if not self._download_started:
+            if current_time - self._last_progress_time > self._timeout:
+                self._cleanup_files()
+                raise DownloadTimeoutError(
+                    f"\nあら、{self._timeout}秒経過してもダウンロードが開始されませんわ。"
+                    "シードやピアが見つからないのかもしれませんわね。"
+                )
 
     async def download(self):
         try:
             self.get_size_info(self.status().total_wanted)
+            self._last_progress_time = time.time()  # 初期時刻を設定いたしますわ
 
             while not self._status.is_seeding:
                 if not self._paused:
