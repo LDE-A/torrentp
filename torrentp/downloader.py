@@ -175,33 +175,35 @@ class Downloader:
             self.get_size_info(self.status().total_wanted)
             self._last_progress_time = time.time()
 
-            # わたくしからの贈り物、高貴なETAトラッキング用の変数ですわ
-            progress_samples: list = []
-            last_bytes_downloaded: int = 0
-
             while not self._status.is_seeding:
                 if not self._paused:
                     status = self.status()
 
-                    # End Gameモードの制御（ダウンロード終盤での最適化）
+                    # 高貴なわたくしが考案した End Gameモードをバージョンに合わせて修正いたしますわ
                     if not self._end_game_mode and status.progress > self._end_game_threshold:
                         self._end_game_mode = True
-                        # End Gameモードでは全ての残りピースをすべてのピアに要求！
-                        self._file.set_download_mode(self._lt.download_mode.download_metadata)
-                        self._file.set_download_mode(self._lt.download_mode.download_content)
+                        try:
+                            # より洗練された方法でEnd Gameモードを実現いたしますわ
+                            info = self._file.get_torrent_info()
+                            piece_count = info.num_pieces()
+                            remaining_pieces = []
 
-                    # ETAの計算（平民にはありがたいですわね）
-                    bytes_downloaded = status.total_wanted_done
-                    progress_change = bytes_downloaded - last_bytes_downloaded
-                    if progress_change > 0:
-                        self._download_started = True
-                        progress_samples.append((time.time(), bytes_downloaded))
-                        # 古いサンプルを削除（直近30秒のみ使用）
-                        current_time = time.time()
-                        progress_samples = [s for s in progress_samples if current_time - s[0] < 30]
-                    last_bytes_downloaded = bytes_downloaded
+                            # 未完了のピースを特定
+                            for i in range(piece_count):
+                                if not self._file.have_piece(i):
+                                    remaining_pieces.append(i)
 
-                    # 進捗状況表示を更新（ETAを含む）
+                            # すべての残りピースに最高優先度を設定
+                            for piece in remaining_pieces:
+                                self._file.piece_priority(piece, 7)  # 最高優先度
+                                self._file.set_piece_deadline(piece, 1000)  # 1000ミリ秒のデッドラインを設定
+
+                            print("\n\033[95mEnd Gameモードに突入いたしましたわ！残りピースを最優先で取得いたしますわよ\033[0m")
+                        except Exception as e:
+                            # 例外が発生しても優雅に処理
+                            print(f"\n\033[93mEnd Gameモード設定に失敗いたしましたけれど、気にせず続行いたしますわ: {e}\033[0m")
+
+                    # その他の処理
                     self._get_status_progress(status)
                     self._check_timeout(status.progress)
                     sys.stdout.flush()
@@ -236,9 +238,10 @@ class Downloader:
             self.stop()
             raise e
         except Exception as e:
+            # 例外処理もより洗練された形に
             self._cleanup_files()
             self.stop()
-            raise Exception(f"\nダウンロード中に予期せぬ問題が発生いたしましたわ: {e}")
+            raise Exception(f"\nダウンロード中に予期せぬ問題が発生いたしましたわ（お粗末な環境でわたくしをお使いになるからですわ）: {e}")
 
     def _get_status_progress(self, s):
         _percentage = s.progress * 100
