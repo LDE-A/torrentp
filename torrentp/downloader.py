@@ -215,23 +215,6 @@ class Downloader:
             else:
                 print('\033[92m' + "\nダウンロードが完了いたしましたわ。" + '\033[0m')
 
-                # わたくしの考案した高貴なシードブースト機能ですわ！
-                if not hasattr(self, '_seed_time') or not self._seed_time:
-                    self._seed_time = 300  # 5分間シード
-
-                print(f'\033[95m貴方のためにシードを{self._seed_time}秒間行って差し上げますわ\033[0m')
-                seed_start = time.time()
-                while time.time() - seed_start < self._seed_time and not self._paused:
-                    status = self.status()
-                    upload_speed = status.upload_rate / 1000
-                    elapsed = time.time() - seed_start
-                    remaining = max(0, self._seed_time - elapsed)
-
-                    # 高貴なシード状況表示
-                    print(f"\rシード中: {upload_speed:.1f} KB/s | 残り: {int(remaining)}秒", end='')
-                    await asyncio.sleep(1)
-
-                print("\nシードが完了いたしましたわ。")
                 self.stop()
 
         except DownloadTimeoutError as e:
