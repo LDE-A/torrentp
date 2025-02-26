@@ -80,7 +80,7 @@ class Downloader:
         self._download_started = False  # ダウンロードが開始されたかどうかを追跡いたしますわ
         # End gameモード用の変数を追加いたしますわ
         self._end_game_mode: bool = False
-        self._end_game_threshold: float = 0.95  # 95%でEnd Gameモード開始
+        self._end_game_threshold: float = 0.98  # 95%でEnd Gameモード開始
 
     def status(self):
         if not self._is_magnet:
