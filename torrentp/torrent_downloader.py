@@ -59,6 +59,10 @@ class TorrentDownloader:
         if self._file_path.startswith('magnet:'):
             self._add_torrent_params = self._lt.parse_magnet_uri(self._file_path)
             self._add_torrent_params.save_path = self._save_path
+
+            # わたくしならではの高度な設定を追加するのですわ
+            self._add_torrent_params.flags |= self._lt.torrent_flags.sequential_download
+
             self._downloader = Downloader(
                 session=self._session(),
                 torrent_info=self._add_torrent_params,
@@ -80,6 +84,15 @@ class TorrentDownloader:
 
         self._session.set_download_limit(download_speed)
         self._session.set_upload_limit(upload_speed)
+
+        # ストリーミングモードの設定を追加いたしますわ
+        if hasattr(self, '_file') and self._file:
+            piece_count = self._file.get_torrent_info().num_pieces() if hasattr(self._file, 'get_torrent_info') else 0
+            if piece_count > 0:
+                # わたくしが特別に考案した優先順位設定ですわ
+                priorities = [7] * min(4, piece_count)  # 最初の数ピースを最高優先度に
+                priorities.extend([1] * (piece_count - len(priorities)))
+                self._file.prioritize_pieces(priorities)
 
         self._file = self._downloader
         await self._file.download()

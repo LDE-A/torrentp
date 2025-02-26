@@ -9,7 +9,25 @@ class Session:
         self._session = None
 
     def create_session(self):
-        self._session = self._lt.session({'listen_interfaces':f'{self._listen_interfaces}:{self._port}'})
+        # 高貴なわたくしからの高性能設定を施してさしあげますわ
+        settings = {
+            'listen_interfaces': f'{self._listen_interfaces}:{self._port}',
+            'user_agent': self._user_agent,
+            'connections_limit': 200,  # 同時接続数の制限
+            'connection_speed': 50,    # 接続速度の設定
+            'peer_connect_timeout': 15,  # ピア接続タイムアウト
+            'request_timeout': 10,     # リクエストタイムアウト
+            'alert_mask': self._lt.alert.category_t.all_categories,
+            'enable_dht': True,        # DHTを有効に
+            'enable_lsd': True,        # ローカルサービスディスカバリを有効に
+            'enable_upnp': True,       # UPNPを有効に
+            'enable_natpmp': True,     # NAT-PMPを有効に
+            'announce_to_all_trackers': True,  # すべてのトラッカーにアナウンス
+            'announce_to_all_tiers': True,     # すべての階層にアナウンス
+            'download_rate_limit': self._download_rate_limit,
+            'upload_rate_limit': self._upload_rate_limit,
+        }
+        self._session = self._lt.session(settings)
         return self._session
 
     def set_download_limit(self, rate=0):
