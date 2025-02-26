@@ -38,8 +38,8 @@ class Downloader:
                     'active_seeds': 4,               # 同時シード数
                     'auto_manage_interval': 30,      # 自動管理間隔（秒）
                     'seed_time_limit': 3600,         # シード時間制限（秒）
-                    'choking_algorithm': 1,          # 最適なアンチョークアルゴリズム
-                    'seed_choking_algorithm': 1,     # 最適なシードチョークアルゴリズム
+                    'choking_algorithm': 2,          # より攻撃的なアルゴリズム
+                    'seed_choking_algorithm': 2,     # シードも贅沢に
                     'use_parole_mode': True,         # 仮釈放モード（効率的ピア管理）
                     'smooth_connects': True,         # 接続平滑化
                     'dont_count_slow_torrents': True, # 低速トレントを制限に含めない
@@ -48,6 +48,19 @@ class Downloader:
                     'prioritize_partial_pieces': True, # 部分ピースの優先
                     'rate_limit_ip_overhead': False, # オーバーヘッドを制限しない
                     'max_failcount': 3,             # 再試行回数
+                    # わたくしだけが知る特別なネットワーク設定ですわ！
+                    'send_buffer_watermark': 5 * 1024 * 1024,  # 送信バッファサイズを5MBに
+                    'send_buffer_watermark_factor': 150,       # バッファ余裕度
+                    'socket_send_buffer_size': 1024 * 1024,    # ソケット送信バッファ1MB
+                    'socket_receive_buffer_size': 1024 * 1024, # ソケット受信バッファ1MB
+                    'connection_speed': 200,                   # 接続速度を上げますわよ
+                    'piece_timeout': 20,                       # ピース取得のタイムアウト（秒）
+                    'request_queue_time': 3,                   # リクエストキュー時間（秒）
+                    'max_allowed_in_request_queue': 4000,      # キューの最大リクエスト数
+                    'whole_pieces_threshold': 5,               # ピース全体のスレッショルド
+                    'peer_turnover': 10,                       # ピアの入れ替え率（%）
+                    'peer_turnover_cutoff': 90,                # ピア入れ替えのカットオフ（%）
+                    'peer_turnover_interval': 30,              # ピア入れ替え間隔（秒）
                 }
 
                 try:
@@ -93,20 +106,29 @@ class Downloader:
 
         # ファイル追加後に追加設定
         if self._file:
-            # わたくしお気に入りの洗練されたピース選択戦略ですわ
+            # 貴族にふさわしい戦略ですわ！
             self._file.set_sequential_download(False)  # ランダムダウンロードの方が高速ですの
 
-            # 初回起動ブーストを適用（最初の数ピースを優先）
+            # レアピース（希少ピース）を優先する戦略を設定しますわ
+            self._file.set_piece_deadline(0, 1000)  # 最初のピースに期限を設定
             if not hasattr(self, '_initial_boost_applied') or not self._initial_boost_applied:
                 try:
                     info = self._file.get_torrent_info()
                     piece_count = info.num_pieces()
-                    if piece_count > 10:
-                        # 最初と最後のピースを優先して良いスタートと早い再生準備を！
-                        priorities = [7] * 5  # 最初の5ピースを最高優先
-                        priorities.extend([1] * (piece_count - 10))  # 中間は通常優先
-                        priorities.extend([7] * 5)  # 最後の5ピースを最高優先
+
+                    # より洗練された戦略を実装いたしますわ
+                    if piece_count > 20:
+                        # 最初と最後に加えて、レアなピースを優先
+                        priorities = [7] * 10  # 最初の10ピースを最高優先
+                        # 中間のピースは通常優先度ですわ
+                        priorities.extend([1] * (piece_count - 20))
+                        # 最後の10ピースも高優先
+                        priorities.extend([7] * 10)
                         self._file.prioritize_pieces(priorities)
+
+                        # スーパーシーディングモードを有効に！
+                        self._file.set_super_seeding(True)
+
                     self._initial_boost_applied = True
                 except Exception:
                     pass
@@ -180,7 +202,7 @@ class Downloader:
                     last_bytes_downloaded = bytes_downloaded
 
                     # 進捗状況表示を更新（ETAを含む）
-                    self._get_status_progress(status, progress_samples)
+                    self._get_status_progress(status)
                     self._check_timeout(status.progress)
                     sys.stdout.flush()
 
@@ -218,26 +240,34 @@ class Downloader:
             self.stop()
             raise Exception(f"\nダウンロード中に予期せぬ問題が発生いたしましたわ: {e}")
 
-    def _get_status_progress(self, s, progress_samples=None):
+    def _get_status_progress(self, s):
         _percentage = s.progress * 100
         _download_speed = s.download_rate / 1000 / 1000
         _upload_speed = s.upload_rate / 1000
+        _remaining_time = "∞"
+
+        # わたくしが優雅に残り時間を計算いたしますわ
+        if _download_speed > 0:
+            _bytes_remaining = s.total_wanted - s.total_wanted_done
+            _seconds_remaining = _bytes_remaining / (s.download_rate if s.download_rate > 0 else 1)
+            _minutes, _seconds = divmod(_seconds_remaining, 60)
+            _hours, _minutes = divmod(_minutes, 60)
+            if _hours > 0:
+                _remaining_time = f"{int(_hours)}h {int(_minutes)}m"
+            elif _minutes > 0:
+                _remaining_time = f"{int(_minutes)}m {int(_seconds)}s"
+            else:
+                _remaining_time = f"{int(_seconds)}s"
 
         counting = math.ceil(_percentage / 5)
         visual_loading = '#' * counting + ' ' * (20 - counting)
 
-        # ETAの計算
-        eta_message = ''
-        if progress_samples and len(progress_samples) > 1:
-            elapsed_time = progress_samples[-1][0] - progress_samples[0][0]
-            bytes_downloaded = progress_samples[-1][1] - progress_samples[0][1]
-            if bytes_downloaded > 0:
-                download_rate = bytes_downloaded / elapsed_time
-                bytes_remaining = s.total_wanted - s.total_wanted_done
-                eta = bytes_remaining / download_rate
-                eta_message = f" | ETA: {int(eta)}秒"
-
-        _message = "\r\033[42m %.2f mb/s \033[0m|\033[46m up: %.1f Kb/s \033[0m| status: %s | peers: %d  \033[96m|%s|\033[0m %d%%%s" % (_download_speed, _upload_speed, s.state, s.num_peers, visual_loading, _percentage, eta_message)
+        # わたくしにふさわしい美しい表示でございますわ
+        _message = (
+            f"\r\033[42m {_download_speed:.2f} MB/s \033[0m|\033[46m アップ: {_upload_speed:.1f} KB/s \033[0m| "
+            f"状態: {s.state} | ピア: {s.num_peers} | 残り: {_remaining_time} "
+            f"\033[96m|{visual_loading}|\033[0m {_percentage:.1f}%"
+        )
         print(_message, end='')
 
     def get_size_info(self, byte_length):

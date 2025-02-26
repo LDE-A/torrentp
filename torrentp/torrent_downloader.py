@@ -85,6 +85,37 @@ class TorrentDownloader:
         self._session.set_download_limit(download_speed)
         self._session.set_upload_limit(upload_speed)
 
+        # わたくしが考案した高貴なアップロード戦略ですわ
+        if upload_speed == 0:
+            # 貴族のように振る舞いなさい - 寛大なアップロードが高速ダウンロードの秘訣ですわ
+            connection_type: str = "無制限"  # デフォルトは無制限に
+            download_cap: int = download_speed
+
+            # お使いの接続環境を自動判定いたしますわ
+            if download_cap > 0:
+                if download_cap < 1024:  # 1MB/s未満の遅い接続
+                    # 下り帯域の30%を上りに（最低50KB/s）
+                    upload_speed = max(50, download_cap // 3)
+                    connection_type = "低速接続"
+                elif download_cap < 8192:  # 8MB/s未満の一般的な接続
+                    # 下り帯域の20%を上りに（最低100KB/s）
+                    upload_speed = max(100, download_cap // 5)
+                    connection_type = "一般接続"
+                else:  # 高速接続
+                    # 下り帯域の15%を上りに（最低400KB/s）
+                    upload_speed = max(400, download_cap // 7)
+                    connection_type = "高速接続"
+
+                print(f"\033[95m{connection_type}を検出: アップロード速度を{upload_speed}KB/sに設定いたしますわ\033[0m")
+                self._session.set_upload_limit(upload_speed)
+            else:
+                # 無制限ダウンロードの場合
+                print("\033[95m無制限接続を検出: アップロードも無制限に設定いたしますわ\033[0m")
+                self._session.set_upload_limit(0)
+        else:
+            print(f"\033[95mアップロード速度を{upload_speed}KB/sに設定いたしますわ\033[0m")
+            self._session.set_upload_limit(upload_speed)
+
         # ストリーミングモードの設定を追加いたしますわ
         if hasattr(self, '_file') and self._file:
             piece_count = self._file.get_torrent_info().num_pieces() if hasattr(self._file, 'get_torrent_info') else 0
