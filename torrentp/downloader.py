@@ -83,79 +83,90 @@ class Downloader:
         self._end_game_threshold: float = 0.98  # 95%でEnd Gameモード開始
 
     def status(self):
-        if not self._is_magnet:
-            self._file = self._session.add_torrent({'ti': self._torrent_info, 'save_path': f'{self._save_path}'})
-            if self._selected_files is not None:
-                # 特定のファイルのみ選択する場合の処理ですわ
-                file_priorities = [0] * self._file.get_torrent_info().num_files()
-                for file_index in self._selected_files:
-                    file_priorities[file_index] = 1
-                self._file.prioritize_files(file_priorities)
-            else:
-                # すべてのファイルをダウンロードする場合の処理ですわ
-                file_priorities = [1] * self._file.get_torrent_info().num_files()
-                self._file.prioritize_files(file_priorities)
-            self._status = self._file.status()
-        elif self._is_magnet:
-            self._add_torrent_params = self._torrent_info
-            self._add_torrent_params.save_path = self._save_path
-            self._file = self._session.add_torrent(self._add_torrent_params)
-            self._status = self._file.status()
-
-            # メタデータ取得を待ちますわ
-            start_time = time.time()
-            metadata_timeout: int = 60  # 最長1分間待ちますわ
-            while not self._file.has_metadata():
-                time.sleep(1)
-                if time.time() - start_time > metadata_timeout:
-                    print("\033[91mメタデータの取得に時間がかかりすぎておりますわ。タイムアウトいたしますわ！\033[0m")
-                    break
-
-            # ここで選択されたファイルのみを設定いたしますわ
-            if self._file.has_metadata() and self._selected_files is not None:
-                try:
+        if not hasattr(self, '_status_initialized') or not self._status_initialized:
+            if not self._is_magnet:
+                self._file = self._session.add_torrent({'ti': self._torrent_info, 'save_path': f'{self._save_path}'})
+                if self._selected_files is not None:
+                    # 特定のファイルのみ選択する場合の処理ですわ
                     file_priorities = [0] * self._file.get_torrent_info().num_files()
                     for file_index in self._selected_files:
-                        if 0 <= file_index < len(file_priorities):
-                            file_priorities[file_index] = 1
-                        else:
-                            print(f"\033[93m警告: ファイルインデックス {file_index} は範囲外ですわ！\033[0m")
+                        file_priorities[file_index] = 1
                     self._file.prioritize_files(file_priorities)
-                    print(f"\033[95m選択されたファイルのみをダウンロードいたしますわ: {self._selected_files}\033[0m")
-                except Exception as e:
-                    print(f"\033[91mファイルの優先度設定に失敗いたしましたわ: {e}\033[0m")
+                else:
+                    # すべてのファイルをダウンロードする場合の処理ですわ
+                    file_priorities = [1] * self._file.get_torrent_info().num_files()
+                    self._file.prioritize_files(file_priorities)
+                self._status = self._file.status()
+            elif self._is_magnet:
+                self._add_torrent_params = self._torrent_info
+                self._add_torrent_params.save_path = self._save_path
+                self._file = self._session.add_torrent(self._add_torrent_params)
+                self._status = self._file.status()
 
-            while(not self._file.has_metadata()):
-                time.sleep(1)
+                # メタデータ取得を待ちますわ
+                start_time = time.time()
+                metadata_timeout: int = 60  # 最長1分間待ちますわ
+                while not self._file.has_metadata():
+                    time.sleep(1)
+                    if time.time() - start_time > metadata_timeout:
+                        print("\033[91mメタデータの取得に時間がかかりすぎておりますわ。タイムアウトいたしますわ！\033[0m")
+                        break
 
-        # ファイル追加後に追加設定
-        if self._file:
-            # 貴族にふさわしい戦略ですわ！
-            self._file.set_sequential_download(False)  # ランダムダウンロードの方が高速ですの
+                # ここで選択されたファイルのみを設定いたしますわ
+                if self._file.has_metadata() and self._selected_files is not None:
+                    try:
+                        file_priorities = [0] * self._file.get_torrent_info().num_files()
+                        for file_index in self._selected_files:
+                            if 0 <= file_index < len(file_priorities):
+                                file_priorities[file_index] = 1
+                            else:
+                                print(f"\033[93m警告: ファイルインデックス {file_index} は範囲外ですわ！\033[0m")
+                        self._file.prioritize_files(file_priorities)
+                        print(f"\033[95m選択されたファイルのみをダウンロードいたしますわ: {self._selected_files}\033[0m")
+                    except Exception as e:
+                        print(f"\033[91mファイルの優先度設定に失敗いたしましたわ: {e}\033[0m")
 
-            # レアピース（希少ピース）を優先する戦略を設定しますわ
-            self._file.set_piece_deadline(0, 1000)  # 最初のピースに期限を設定
-            if not hasattr(self, '_initial_boost_applied') or not self._initial_boost_applied:
-                try:
-                    info = self._file.get_torrent_info()
-                    piece_count = info.num_pieces()
+                while(not self._file.has_metadata()):
+                    time.sleep(1)
 
-                    # より洗練された戦略を実装いたしますわ
-                    if piece_count > 20:
-                        # 最初と最後に加えて、レアなピースを優先
-                        priorities = [7] * 10  # 最初の10ピースを最高優先
-                        # 中間のピースは通常優先度ですわ
-                        priorities.extend([1] * (piece_count - 20))
-                        # 最後の10ピースも高優先
-                        priorities.extend([7] * 10)
-                        self._file.prioritize_pieces(priorities)
+            # ファイル追加後に追加設定
+            if self._file:
+                # 貴族にふさわしい戦略ですわ！
+                self._file.set_sequential_download(False)  # ランダムダウンロードの方が高速ですの
 
-                        # スーパーシーディングモードを有効に！
-                        self._file.set_super_seeding(True)
+                # レアピース（希少ピース）を優先する戦略を設定しますわ
+                self._file.set_piece_deadline(0, 1000)  # 最初のピースに期限を設定
+                if not hasattr(self, '_initial_boost_applied') or not self._initial_boost_applied:
+                    try:
+                        info = self._file.get_torrent_info()
+                        piece_count = info.num_pieces()
 
-                    self._initial_boost_applied = True
-                except Exception:
-                    pass
+                        # より洗練された戦略を実装いたしますわ
+                        if piece_count > 20:
+                            # 最初と最後に加えて、レアなピースを優先
+                            priorities = [7] * 10  # 最初の10ピースを最高優先
+                            # 中間のピースは通常優先度ですわ
+                            priorities.extend([1] * (piece_count - 20))
+                            # 最後の10ピースも高優先
+                            priorities.extend([7] * 10)
+                            self._file.prioritize_pieces(priorities)
+
+                            # スーパーシーディングモードを有効に！
+                            self._file.set_super_seeding(True)
+
+                        self._initial_boost_applied = True
+                    except Exception:
+                        pass
+
+            # 状態の初期化が完了したことを記録いたしますわ
+            self._status_initialized = True
+        else:
+            # 2回目以降の呼び出し時は単純に状態を更新するだけですわ
+            if not self._is_magnet:
+                self._file = self._session.add_torrent({'ti': self._torrent_info, 'save_path': f'{self._save_path}'})
+                self._status = self._file.status()
+            elif self._is_magnet:
+                self._status = self._file.status()
 
         return self._status
 
