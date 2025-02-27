@@ -118,12 +118,32 @@ class TorrentDownloader:
 
         # ストリーミングモードの設定を追加いたしますわ
         if hasattr(self, '_file') and self._file:
-            piece_count = self._file.get_torrent_info().num_pieces() if hasattr(self._file, 'get_torrent_info') else 0
-            if piece_count > 0:
-                # わたくしが特別に考案した優先順位設定ですわ
-                priorities = [7] * min(4, piece_count)  # 最初の数ピースを最高優先度に
-                priorities.extend([1] * (piece_count - len(priorities)))
-                self._file.prioritize_pieces(priorities)
+            try:
+                # マグネットリンクの場合はメタデータの取得を確認いたしますわ
+                if self._file_path.startswith('magnet:'):
+                    # メタデータがあるか確認
+                    if not self._file.has_metadata():
+                        print("\033[93mあら、まだメタデータがございませんわ。ピース優先度設定はスキップいたしますわ\033[0m")
+                        return
+
+                # 有効なハンドルかどうか確認いたしますわ
+                handle_valid = True
+                try:
+                    # ハンドルの状態を確認
+                    _ = self._file.status()
+                except Exception:
+                    handle_valid = False
+
+                if handle_valid and self._file.has_metadata():
+                    piece_count = self._file.get_torrent_info().num_pieces()
+                    if piece_count > 0:
+                        # わたくしが特別に考案した優先順位設定ですわ
+                        priorities = [7] * min(4, piece_count)  # 最初の数ピースを最高優先度に
+                        priorities.extend([1] * (piece_count - len(priorities)))
+                        self._file.prioritize_pieces(priorities)
+            except Exception as e:
+                print(f"\033[93m警告: ピース優先度の設定中に問題が発生いたしましたわ: {e}\033[0m")
+                # エラーが発生しても続行いたしますわ
 
         self._file = self._downloader
         await self._file.download()
