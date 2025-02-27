@@ -223,17 +223,33 @@ class Downloader:
                             piece_count = info.num_pieces()
                             remaining_pieces = []
 
-                            # 未完了のピースを特定
-                            for i in range(piece_count):
+                            # 選択されたファイルのピースのみを対象にいたしますわ
+                            selected_pieces = set()
+                            if self._selected_files is not None:
+                                # 選択されたファイルに対応するピースを特定いたしますわ
+                                for file_index in self._selected_files:
+                                    if 0 <= file_index < info.num_files():
+                                        file_entry = info.files().at(file_index)
+                                        # ファイルの開始ピースと終了ピース
+                                        start_piece = int(file_entry.offset / info.piece_length())
+                                        end_piece = int((file_entry.offset + file_entry.size - 1) / info.piece_length()) + 1
+                                        for i in range(start_piece, min(end_piece, piece_count)):
+                                            selected_pieces.add(i)
+                            else:
+                                # すべてのファイルが選択されている場合
+                                selected_pieces = set(range(piece_count))
+
+                            # 未完了の「選択されたピース」のみを特定
+                            for i in selected_pieces:
                                 if not self._file.have_piece(i):
                                     remaining_pieces.append(i)
 
-                            # すべての残りピースに最高優先度を設定
+                            # 残りピースに最高優先度を設定
                             for piece in remaining_pieces:
                                 self._file.piece_priority(piece, 7)  # 最高優先度
                                 self._file.set_piece_deadline(piece, 1000)  # 1000ミリ秒のデッドラインを設定
 
-                            print("\n\033[95mEnd Gameモードに突入いたしましたわ！残りピースを最優先で取得いたしますわよ\033[0m")
+                            print(f"\n\033[95mEnd Gameモードに突入いたしましたわ！残り{len(remaining_pieces)}個のピースを最優先で取得いたしますわよ\033[0m")
                         except Exception as e:
                             # 例外が発生しても優雅に処理
                             print(f"\n\033[93mEnd Gameモード設定に失敗いたしましたけれど、気にせず続行いたしますわ: {e}\033[0m")
