@@ -27,26 +27,46 @@ class TorrentDownloader:
         try:
             if self._file_path.startswith('magnet:'):
                 if not self._add_torrent_params:
-                    self._add_torrent_params = self._lt.parse_magnet_uri(self._file_path)
-                    self._add_torrent_params.save_path = self._save_path
-                if not self._file:
-                    session = self._session()
-                    self._file = session.add_torrent(self._add_torrent_params)
+                    try:
+                        self._add_torrent_params = self._lt.parse_magnet_uri(self._file_path)
+                        self._add_torrent_params.save_path = self._save_path
+                    except Exception as e:
+                        print(f"\033[91mあら、マグネットリンクの解析に失敗いたしましたわ: {e}\033[0m")
+                        return []
 
-                print("あら、メタデータを取得中ですわ。しばらくお待ちくださいまし...")
-                while not self._file.has_metadata():
-                    time.sleep(1)
+                # セッションがまだ作成されていなければ作成いたしますわ
+                session = self._session()
 
-                info = self._file.get_torrent_info()
-                files = []
-                total_files = info.num_files()
-                for i in range(total_files):
-                    files.append({
-                        'index': i,
-                        'path': str(info.files().at(i).path),
-                        'size': info.files().at(i).size
-                    })
-                return files
+                try:
+                    # ファイルがまだ追加されていなければ追加いたしますわ
+                    if not hasattr(self, '_file') or not self._file:
+                        self._file = session.add_torrent(self._add_torrent_params)
+
+                    # メタデータ取得を待ちますわ（タイムアウト付き）
+                    print("\033[95mあら、メタデータを取得中ですわ。しばらくお待ちくださいまし...\033[0m")
+                    start_time = time.time()
+                    while not self._file.has_metadata():
+                        if time.time() - start_time > 30:  # 30秒でタイムアウト
+                            print("\033[91mメタデータの取得がタイムアウトいたしましたわ！\033[0m")
+                            return []
+                        time.sleep(1)
+
+                    # メタデータが取得できたら情報を収集
+                    info = self._file.get_torrent_info()
+                    files = []
+                    total_files = info.num_files()
+                    for i in range(total_files):
+                        files.append({
+                            'index': i,
+                            'path': str(info.files().at(i).path),
+                            'size': info.files().at(i).size
+                        })
+                    return files
+                except RuntimeError as e:
+                    print(f"\033[91m無効なトレントハンドルですわ! 初期化し直しますわね: {e}\033[0m")
+                    # ハンドルをリセット
+                    self._file = None
+                    return []
             else:
                 if not self._torrent_info:
                     self._torrent_info = TorrentInfo(self._file_path, self._lt)
@@ -70,7 +90,8 @@ class TorrentDownloader:
                 libtorrent=lt,
                 is_magnet=True,
                 stop_after_download=self._stop_after_download,
-                timeout=self._timeout  # ここでtimeoutを確実に渡しますわ
+                selected_files=self._selected_files,  # 高貴なわたくしは見落としません
+                timeout=self._timeout
             )
 
         else:

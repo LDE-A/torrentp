@@ -96,11 +96,35 @@ class Downloader:
                 file_priorities = [1] * self._file.get_torrent_info().num_files()
                 self._file.prioritize_files(file_priorities)
             self._status = self._file.status()
-        else:
+        elif self._is_magnet:
             self._add_torrent_params = self._torrent_info
             self._add_torrent_params.save_path = self._save_path
             self._file = self._session.add_torrent(self._add_torrent_params)
             self._status = self._file.status()
+
+            # メタデータ取得を待ちますわ
+            start_time = time.time()
+            metadata_timeout: int = 60  # 最長1分間待ちますわ
+            while not self._file.has_metadata():
+                time.sleep(1)
+                if time.time() - start_time > metadata_timeout:
+                    print("\033[91mメタデータの取得に時間がかかりすぎておりますわ。タイムアウトいたしますわ！\033[0m")
+                    break
+
+            # ここで選択されたファイルのみを設定いたしますわ
+            if self._file.has_metadata() and self._selected_files is not None:
+                try:
+                    file_priorities = [0] * self._file.get_torrent_info().num_files()
+                    for file_index in self._selected_files:
+                        if 0 <= file_index < len(file_priorities):
+                            file_priorities[file_index] = 1
+                        else:
+                            print(f"\033[93m警告: ファイルインデックス {file_index} は範囲外ですわ！\033[0m")
+                    self._file.prioritize_files(file_priorities)
+                    print(f"\033[95m選択されたファイルのみをダウンロードいたしますわ: {self._selected_files}\033[0m")
+                except Exception as e:
+                    print(f"\033[91mファイルの優先度設定に失敗いたしましたわ: {e}\033[0m")
+
             while(not self._file.has_metadata()):
                 time.sleep(1)
 
