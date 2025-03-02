@@ -109,8 +109,7 @@ class Downloader:
                 while not self._file.has_metadata():
                     time.sleep(1)
                     if time.time() - start_time > metadata_timeout:
-                        print("\033[91mメタデータの取得に時間がかかりすぎておりますわ。タイムアウトいたしますわ！\033[0m")
-                        break
+                        raise DownloadTimeoutError("メタデータの取得に時間がかかりすぎておりますわ。タイムアウトいたしますわ！")
 
                 # ここで選択されたファイルのみを設定いたしますわ
                 if self._file.has_metadata() and self._selected_files is not None:
