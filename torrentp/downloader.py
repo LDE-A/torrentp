@@ -54,7 +54,7 @@ class Downloader:
                     'socket_send_buffer_size': 1024 * 1024,    # ソケット送信バッファ1MB
                     'socket_receive_buffer_size': 1024 * 1024, # ソケット受信バッファ1MB
                     'connection_speed': 200,                   # 接続速度を上げますわよ
-                    'piece_timeout': 20,                       # ピース取得のタイムアウト（秒）
+                    'piece_timeout': 60,                       # ピース取得のタイムアウト（秒）
                     'request_queue_time': 3,                   # リクエストキュー時間（秒）
                     'max_allowed_in_request_queue': 4000,      # キューの最大リクエスト数
                     'whole_pieces_threshold': 5,               # ピース全体のスレッショルド
